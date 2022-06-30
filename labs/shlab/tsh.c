@@ -167,28 +167,35 @@ int main(int argc, char **argv)
 void eval(char *cmdline) 
 {
   static char *argv[MAXARGS] = {};
+  sigset_t mask_chld,mask_all,prev_mask;
+  sigfillset(&mask_all);
+  sigemptyset(&mask_chld);
+  sigaddset(&mask_chld,SIGCHLD);
 
-  int bg=parseline(cmdline,argv);
-  
+  int state=(parseline(cmdline,argv)==0)?FG:BG;
+
   if(!argv[0]) return;  
 
   if(!builtin_cmd(argv)){
     int pid = fork();
+    sigprocmask(SIG_BLOCK,&mask_chld,&prev_mask);
     if(pid<0){
       unix_error("tsh:Error folking\n");
     }else if(pid==0){
       setpgid(0,0);
+      sigprocmask(SIG_SETMASK,&prev_mask,NULL);
       if(execve(argv[0],argv,environ)<0){
         printf("tsh: Unknown command: %s\n",argv[0]);
         fflush(stdout);
         exit(0);
       }
     }else{
-      if(!bg){
-        addjob(jobs,pid,FG,cmdline);
-        waitfg(pid); 
+        sigprocmask(SIG_BLOCK,&mask_all,NULL);
+        addjob(jobs,pid,state,cmdline);
+        sigprocmask(SIG_SETMASK,&prev_mask,NULL);
+      if(state==FG){
+        waitfg(pid);
       }else{
-        addjob(jobs,pid,BG,cmdline);
         printf("%d %s",pid,cmdline);
         fflush(stdout);
       }
@@ -364,11 +371,18 @@ void waitfg(pid_t pid)
  */
 void sigchld_handler(int sig) 
 {   
+    sigset_t mask_all,prev_mask;
     int status;
-    pid_t pid=waitpid(-1,&status,WNOHANG);
-    if(WIFEXITED(status)){
-      deletejob(jobs,pid);
-    }
+    pid_t pid;
+
+    sigfillset(&mask_all);
+
+    while((pid=waitpid(-1,&status,0))>0)
+      if(WIFEXITED(status)){
+        sigprocmask(SIG_BLOCK,&mask_all,&prev_mask);
+        deletejob(jobs,pid);
+        sigprocmask(SIG_SETMASK,&prev_mask,NULL);
+      }
     return;
 }
 
