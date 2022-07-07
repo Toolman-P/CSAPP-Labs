@@ -29,23 +29,60 @@ ncopy:
 ##################################################################
 # You can modify this portion
 	# Loop header
+  irmovq $4,%r12 
+  irmovq $1,%r13
 	xorq %rax,%rax		# count = 0;
-	andq %rdx,%rdx		# len <= 0?
-	jle Done		# if so, goto Done:
+  rrmovq %rdx,%r14
+  subq %r12,%r14 #len<=4?
+  jle Small #jump to small loop
+  
+Big:
+  mrmovq (%rdi),%r8	# read val from src...
+  mrmovq 8(%rdi),%r9
+  mrmovq 16(%rdi),%r10
+  mrmovq 24(%rdi),%r11
 
-Loop:	mrmovq (%rdi), %r10	# read val from src...
-	rmmovq %r10, (%rsi)	# ...and store it to dst
-	andq %r10, %r10		# val <= 0?
-	jle Npos		# if so, goto Npos:
-	irmovq $1, %r10
-	addq %r10, %rax		# count++
-Npos:	irmovq $1, %r10
-	subq %r10, %rdx		# len--
-	irmovq $8, %r10
-	addq %r10, %rdi		# src++
-	addq %r10, %rsi		# dst++
-	andq %rdx,%rdx		# len > 0?
-	jg Loop			# if so, goto Loop:
+	rmmovq %r8,(%rsi)	# ...and store it to dst
+  rmmovq %r9,8(%rsi)
+  rmmovq %r10,16(%rsi)
+  rmmovq %r11,24(%rsi)
+test1:
+	andq %r8,%r8		# val <= 0?
+	jle test2		# if so, goto Npos:
+	addq %r13,%rax		# count++
+test2:
+  andq %r9,%r9
+  jle test3
+  addq %r13,%rax
+test3:
+  andq %r10,%r10
+  jle test4
+  addq %r13,%rax
+test4:
+  andq %r11,%r11
+  jle N1pos
+	addq %r13,%rax		# count++
+N1pos:
+	subq %r12, %rdx		# len-=4
+	iaddq $32, %rdi		# src++
+	iaddq $32, %rsi		# dst++
+  rrmovq %rdx,%r14
+  subq %r12,%r14
+	jg Big			# if so, goto Loop:
+Small:
+  andq %rdx,%rdx
+  jle Done
+  mrmovq (%rdi),%r8
+  rmmovq %r8,(%rsi)
+  andq %r8,%r8
+  jle N2pos
+  addq %r13,%rax
+N2pos:
+  subq %r13,%rdx
+  iaddq $8,%rdi
+  iaddq $8,%rsi
+  andq %rdx,%rdx
+  jg Small
 ##################################################################
 # Do not modify the following section of code
 # Function epilogue.
@@ -62,69 +99,69 @@ EndFun:
 ###############################
 	.align 8
 src:
-	.quad 1
-	.quad -2
-	.quad 3
+	.quad -1
+	.quad 2
+	.quad -3
 	.quad -4
 	.quad 5
 	.quad -6
 	.quad 7
 	.quad 8
 	.quad -9
-	.quad 10
-	.quad 11
+	.quad -10
+	.quad -11
 	.quad -12
-	.quad -13
+	.quad 13
 	.quad -14
-	.quad 15
-	.quad -16
+	.quad -15
+	.quad 16
 	.quad -17
 	.quad -18
-	.quad 19
-	.quad -20
+	.quad -19
+	.quad 20
 	.quad -21
-	.quad 22
+	.quad -22
 	.quad 23
-	.quad 24
-	.quad 25
+	.quad -24
+	.quad -25
 	.quad -26
-	.quad 27
-	.quad 28
-	.quad -29
+	.quad -27
+	.quad -28
+	.quad 29
 	.quad -30
 	.quad -31
 	.quad 32
-	.quad 33
-	.quad 34
-	.quad -35
-	.quad 36
-	.quad 37
-	.quad 38
-	.quad -39
-	.quad -40
+	.quad -33
+	.quad -34
+	.quad 35
+	.quad -36
+	.quad -37
+	.quad -38
+	.quad 39
+	.quad 40
 	.quad -41
 	.quad 42
 	.quad 43
 	.quad -44
-	.quad -45
-	.quad -46
+	.quad 45
+	.quad 46
 	.quad -47
 	.quad -48
-	.quad 49
+	.quad -49
 	.quad 50
 	.quad 51
-	.quad -52
+	.quad 52
 	.quad 53
-	.quad -54
+	.quad 54
 	.quad 55
 	.quad 56
 	.quad 57
-	.quad -58
+	.quad 58
 	.quad 59
-	.quad -60
-	.quad -61
-	.quad -62
-	.quad -63
+	.quad 60
+	.quad 61
+	.quad 62
+	.quad 63
 	.quad 0xbcdefa # This shouldn't get moved
 
 	.align 16

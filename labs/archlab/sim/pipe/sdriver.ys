@@ -29,23 +29,60 @@ ncopy:
 ##################################################################
 # You can modify this portion
 	# Loop header
+  irmovq $4,%r12 
+  irmovq $1,%r13
 	xorq %rax,%rax		# count = 0;
-	andq %rdx,%rdx		# len <= 0?
-	jle Done		# if so, goto Done:
+  rrmovq %rdx,%r14
+  subq %r12,%r14 #len<=4?
+  jle Small #jump to small loop
+  
+Big:
+  mrmovq (%rdi),%r8	# read val from src...
+  mrmovq 8(%rdi),%r9
+  mrmovq 16(%rdi),%r10
+  mrmovq 24(%rdi),%r11
 
-Loop:	mrmovq (%rdi), %r10	# read val from src...
-	rmmovq %r10, (%rsi)	# ...and store it to dst
-	andq %r10, %r10		# val <= 0?
-	jle Npos		# if so, goto Npos:
-	irmovq $1, %r10
-	addq %r10, %rax		# count++
-Npos:	irmovq $1, %r10
-	subq %r10, %rdx		# len--
-	irmovq $8, %r10
-	addq %r10, %rdi		# src++
-	addq %r10, %rsi		# dst++
-	andq %rdx,%rdx		# len > 0?
-	jg Loop			# if so, goto Loop:
+	rmmovq %r8,(%rsi)	# ...and store it to dst
+  rmmovq %r9,8(%rsi)
+  rmmovq %r10,16(%rsi)
+  rmmovq %r11,24(%rsi)
+test1:
+	andq %r8,%r8		# val <= 0?
+	jle test2		# if so, goto Npos:
+	addq %r13,%rax		# count++
+test2:
+  andq %r9,%r9
+  jle test3
+  addq %r13,%rax
+test3:
+  andq %r10,%r10
+  jle test4
+  addq %r13,%rax
+test4:
+  andq %r11,%r11
+  jle N1pos
+	addq %r13,%rax		# count++
+N1pos:
+	subq %r12, %rdx		# len-=4
+	iaddq $32, %rdi		# src++
+	iaddq $32, %rsi		# dst++
+  rrmovq %rdx,%r14
+  subq %r12,%r14
+	jg Big			# if so, goto Loop:
+Small:
+  andq %rdx,%rdx
+  jle Done
+  mrmovq (%rdi),%r8
+  rmmovq %r8,(%rsi)
+  andq %r8,%r8
+  jle N2pos
+  addq %r13,%rax
+N2pos:
+  subq %r13,%rdx
+  iaddq $8,%rdi
+  iaddq $8,%rsi
+  andq %rdx,%rdx
+  jg Small
 ##################################################################
 # Do not modify the following section of code
 # Function epilogue.
@@ -62,8 +99,8 @@ EndFun:
 ###############################
 	.align 8
 src:
-	.quad -1
-	.quad 2
+	.quad 1
+	.quad -2
 	.quad 3
 	.quad -4
 	.quad 0xbcdefa # This shouldn't get moved
